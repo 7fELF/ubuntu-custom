@@ -13,10 +13,11 @@ then
     exit
   fi
   debootstrap "$RELEASE" .
-(cd /dev && MAKEDEV -v generic)
   env -i LANG=C.UTF-8 TERM=xterm HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
   exit
 fi
+
+(cd /dev && MAKEDEV -v generic)
 
 mount none /proc -t proc
 mount devpts /dev/pts -t devpts
