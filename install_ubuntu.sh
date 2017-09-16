@@ -13,7 +13,7 @@ then
     exit
   fi
   debootstrap "$RELEASE" .
-  env -i LANG=C.UTF-8 TERM=xterm HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
+  env -i LANG=C.UTF-8 TERM=$TERM http_proxy=$http_proxy HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
   exit
 fi
 
