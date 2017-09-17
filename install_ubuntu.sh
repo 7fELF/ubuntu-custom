@@ -1,5 +1,5 @@
 #!/bin/bash
-DEVICE="sda6"
+DEVICE="sda2"
 RELEASE=xenial
 # RELEASE=artful
 
@@ -13,15 +13,14 @@ then
     exit
   fi
   debootstrap "$RELEASE" .
-  env -i LANG=C.UTF-8 TERM=$TERM http_proxy=$http_proxy HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
+  env -i LANG=C.UTF-8 TERM="$TERM" http_proxy="$http_proxy" HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
   exit
 fi
 
-(cd /dev && MAKEDEV -v generic)
-
-mount none /proc -t proc
-mount devpts /dev/pts -t devpts
-mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs  /dev
+mount -t proc     proc      /proc
+mount -t devpts   devpts    /dev/pts
+mount -t sysfs    sysfs     /sys
 
 export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin'
 
