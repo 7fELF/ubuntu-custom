@@ -1,20 +1,62 @@
 #!/bin/bash
-DEVICE="sda2"
-RELEASE=xenial
-# RELEASE=artful
+set -e
+set -x
 
-set -ex
+ ## Manually set device
+# DEVICE=sdb2
+
+## Uncomment to use /dev/sdx format instead of UUID in fstab
+# DEVICE_UUID=/dev/$DEVICE
+
+## Manually set filesystem
+# DEVICE_FILESYSTEM=ext4
+
+## Default release, used if $RELEASE is not set
+DEFAULT_RELEASE=disco
+HOSTNAME=ubuntu
+
+COLOR_ERROR='\033[0;31m'
+COLOR_SUCCESS='\033[0;32m'
+COLOR_WARN='\033[0;33m'
+COLOR_DEFAULT='\033[0m'
+function error {
+    echo -e "${COLOR_ERROR}${1}${COLOR_DEFAULT}"
+    exit 1
+}
+
+function warn {
+    echo -e "${COLOR_WARN}${1}${COLOR_DEFAULT}"
+}
+
+[ $UID -eq 0 ] || error "Run this as root"
+
+[ -z $RELEASE ] && warn "Warning: RELEASE not set, falling back to $DEFAULT_RELEASE" && RELEASE="$DEFAULT_RELEASE"
+DEVICE=${DEVICE:-"$(df . --output=source | tail -n 1 | sed "s/\/dev\///")"}
+if [ -z $DEVICE_UUID ]
+then
+    DEVICE_UUID="UUID=$(blkid /dev/"$DEVICE" -s UUID -o value)" || error "Device $DEVICE not found"
+fi
+[ -z $DEVICE_FILESYSTEM ] && DEVICE_FILESYSTEM=$(blkid /dev/"$DEVICE" -s TYPE -o value)
+
+warn "Installing Ubuntu $RELEASE on $DEVICE ($DEVICE_UUID)"
 
 if [ "$1" != "step2" ]
 then
-  if [ ! "$(ls -A | grep -v install_ubuntu.sh | grep -cv "$RELEASE".tar)" -eq 0 ]
-  then
-    echo "folder not empty";
+    read -r -p "Are you sure? [y/N] " response
+    if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]
+    then
+        error "Cancelled"
+    fi
+
+    if [ ! "$(ls -A | grep -v install_ubuntu.sh | grep -v "lost+found" | grep -cv "$RELEASE".tar)" -eq 0 ]
+    then
+        echo "folder not empty";
+        exit
+    fi
+
+    debootstrap "$RELEASE" .
+    env -i LANG=C.UTF-8 TERM="$TERM" http_proxy="$http_proxy" HOME=/root RELEASE=$RELEASE DEVICE_UUID=$DEVICE_UUID DEVICE_FILESYSTEM=$DEVICE_FILESYSTEM /usr/sbin/chroot . /install_ubuntu.sh "step2"
     exit
-  fi
-  debootstrap "$RELEASE" .
-  env -i LANG=C.UTF-8 TERM="$TERM" http_proxy="$http_proxy" HOME=/root /usr/sbin/chroot . /install_ubuntu.sh "step2"
-  exit
 fi
 
 mount -t devtmpfs devtmpfs  /dev
@@ -26,7 +68,7 @@ export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/
 
 cat << EOF > /etc/fstab
 # <file system>                                 <mount point>   <type>        <options>             <dump>  <pass>
-UUID=$(blkid /dev/"$DEVICE" -s UUID -o value)   /               $(blkid /dev/"$DEVICE" -s TYPE -o value)   async,discard,noatime 0       1
+$DEVICE_UUID  /               $DEVICE_FILESYSTEM   async,discard,noatime 0       1
 EOF
 
 
@@ -40,8 +82,8 @@ export LC_ALL=en_US.UTF-8;
 locale-gen en_US.UTF-8
 DEBIAN_FRONTEND=noninteractive dpkg-reconfigure locales
 
-echo ubuntu > /etc/hostname
-echo "127.0.0.1       $(cat /etc/hostname)" >> /etc/hosts
+echo $HOSTNAME > /etc/hostname
+echo "127.0.0.1       $HOSTNAME" >> /etc/hosts
 
 cat << EOF > /etc/apt/sources.list
 deb http://fr.archive.ubuntu.com/ubuntu/ "$RELEASE" main restricted
@@ -99,10 +141,11 @@ apt upgrade -y
 
 
 apt install -y --no-install-recommends \
-  linux-image-4.11.0-13-generic \
-  linux-headers-4.11.0-13-generic \
-  linux-image-extra-4.11.0-13-generic \
-  linux-firmware
+  linux-image-generic \
+  linux-headers-generic \
+  linux-firmware \
+  # linux-image-extra-4.15.0-15-generic \
+  # linux-image-extra-*-generic \
 
 apt install -y \
   btrfs-tools \
@@ -119,149 +162,8 @@ adduser antoine admin
 sed -i "/^%admin/s/ALL$/NOPASSWD:ALL/g" /etc/sudoers
 
 PACKAGES=(
-alsa-base
-alsa-utils
-anacron
-at-spi2-core
-bc
-ca-certificates
-checkbox-gui
-dmz-cursor-theme
-doc-base
-fonts-dejavu-core
-fonts-freefont-ttf
-foomatic-db-compressed-ppds
-genisoimage
-ghostscript-x
-gnome-menus
-gnome-session-canberra
-gstreamer1.0-alsa
-gstreamer1.0-plugins-base-apps
-gstreamer1.0-pulseaudio
-gvfs-bin
-inputattach
-language-selector-gnome
-libatk-adaptor
-libnotify-bin
-libsasl2-modules
-lightdm
-nautilus
-notify-osd
-openprinting-ppds
-printer-driver-pnm2ppa
-pulseaudio
-rfkill
-software-properties-gtk
-ubuntu-artwork
-ubuntu-drivers-common
-ubuntu-release-upgrader-gtk
-ubuntu-session
-ubuntu-settings
-ubuntu-sounds
-unity
-unity-control-center
-unity-greeter
-unity-settings-daemon
-unzip
-update-manager
-update-notifier
-wireless-tools
-wpasupplicant
-xdg-user-dirs
-xdg-user-dirs-gtk
-xdiagnose
-xkb-data
-xorg
-yelp
-zenity
-zip
-
-acpi-support
-activity-log-manager
-app-install-data-partner
-apport-gtk
-avahi-autoipd
-avahi-daemon
-baobab
-bluez
-bluez-cups
-branding-ubuntu
-cups
-cups-bsd
-cups-client
-cups-filters
-eog
-evince
-file-roller
-firefox
-fonts-guru
-fonts-kacst-one
-fonts-khmeros-core
-fonts-lao
-fonts-liberation
-fonts-lklug-sinhala
-fonts-nanum
-fonts-noto-cjk
-fonts-sil-abyssinica
-fonts-sil-padauk
-fonts-takao-pgothic
-fonts-thai-tlwg
-fonts-tibetan-machine
-fwupd
-fwupdate
-fwupdate-signed
-gnome-bluetooth
-gnome-calculator
-gnome-font-viewer
-gnome-keyring
-gnome-orca
-gnome-power-manager
-gnome-screensaver
-gnome-screenshot
-gnome-system-monitor
-terminator
-gnupg-agent
-gucharmap
-gvfs-fuse
-hplip
-ibus
-ibus-gtk
-ibus-gtk3
-ibus-table
-im-config
-kerneloops-daemon
-laptop-detect
-libgail-common
-libnss-mdns
-libpam-gnome-keyring
-libproxy1-plugin-gsettings
-libproxy1-plugin-networkmanager
-libqt4-sql-sqlite
-libwmf0.2-7-gtk
-mousetweaks
-network-manager-gnome
-onboard
-overlay-scrollbar-gtk2
-pcmciautils
-#plymouth-theme-ubuntu-logo
-policykit-desktop-privileges
-pulseaudio-module-bluetooth
-pulseaudio-module-x11
-python3-aptdaemon.pkcompat
-qt-at-spi
-seahorse
-sni-qt
-system-config-printer-gnome
-ttf-ancient-fonts-symbola
-ttf-ubuntu-font-family
-ubuntu-software
-whoopsie
-xcursor-themes
-xdg-utils
-xterm
-xul-ext-ubufox
-zeitgeist-core
-zeitgeist-datahub
+ubuntu-desktop
+ubuntu-restricted-extras
 )
 
 apt install -y  "${PACKAGES[@]}"
@@ -270,3 +172,10 @@ echo "Password for Antoine:"
 passwd antoine
 echo "Openning a shell in chroot"
 bash
+
+echo "Unmounting virtual file systems"
+umount /dev/pts
+umount /dev
+umount /proc
+umount /sys
+echo -e "${COLOR_SUCCESS}Success${COLOR_DEFAULT}"
